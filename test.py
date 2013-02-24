@@ -117,7 +117,6 @@ def test_possible_moves_home1():
         brd = brd.move(13, 5)
     for i in range(3):
         brd = brd.move(8, 4)
-    print(brd)
     roll = Roll(5, 3)
     expected = {1: [], 4: [], 5: [0,2], 6: [3]}
     for point in (1, 4, 5, 6):
@@ -390,7 +389,7 @@ def test_weighted_strategy1():
 def test_blocked1():
     'Home should never be considered blocked.'
     brd = Board.from_str('''[ 12:W3 | 11    | 10    |  9    |  8    |  7    ] [  6:B6 |  5:B3 |  4:B2 |  3:B4 |  2    |  1:W1 ] [  0:W1:B0 ]
-                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W3 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
+                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W2 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
     assert not brd.points[0].blocked(BLACK)
     brd = brd.move(12, 0)
     assert not brd.points[0].blocked(BLACK)
@@ -399,9 +398,23 @@ def test_blocked1():
 def test_can_home_when_enemy_jailed1():
     'Should be able to move home even with enemies jailed.'
     brd = Board.from_str('''[ 12:W2 | 11    | 10    |  9    |  8    |  7    ] [  6:B6 |  5:B3 |  4:B2 |  3:B4 |  2    |  1:W1 ] [  0:W2:B0 ]
-                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W3 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
+                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W2 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
     print( brd.possible_moves(Roll(3, 2), 3) )
     assert 0 in brd.possible_moves(Roll(3, 2), 3), 'cannot move home'
+
+
+def test_can_home_when_larger_points_exhausted1():
+    'Should be able to move home when all larger points exhausted.'
+    brd = Board.from_str('''[ 12:W2 | 11    | 10    |  9    |  8    |  7    ] [  6    |  5:B6 |  4:B3 |  3:B4 |  2:B2    |  1:W1 ] [  0:W2:B0 ]
+                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W2 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
+    print( brd.possible_moves(Roll(6, 1), 5) )
+    assert 0 in brd.possible_moves(Roll(6, 1), 5), 'cannot move home'
+
+def test_cant_home_when_larger_points_homeable1():
+    'Should be forced to use further pieces when can go home.'
+    brd = Board.from_str('''[ 12:W2 | 11    | 10    |  9    |  8    |  7    ] [  6    |  5:B6 |  4:B3 |  3:B4 |  2:B2    |  1:W1 ] [  0:W2:B0 ]
+                            [ 13    | 14    | 15    | 16    | 17:W3 | 18    ] [ 19:W2 | 20:W1 | 21:W2 | 22    | 23:W2 | 24    ] [ 25:B0:W0 ]''')
+    equals([], brd.possible_moves(Roll(4, 3), 2))
 
 
     # for path in game.all_choices():

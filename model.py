@@ -8,6 +8,8 @@ from util import KeyedMixin
 
 WHITE = 'W'
 BLACK = 'B'
+WHITE_HOME = 25
+BLACK_HOME = 0
 
 
 class Board(object):
@@ -86,7 +88,7 @@ class Board(object):
         l = []
         out = l.append
         out('[ ')
-        for i in range(12, 0, -1):
+        for i in range(BLACK_HOME+12, BLACK_HOME, -1):
             if i == 6:
                 out(' ] [ ')
             out(str(I.points[i]))
@@ -94,8 +96,8 @@ class Board(object):
                 out(' | ')
         homed = len(I.homed(BLACK))
         jailed = len(I.jailed(WHITE))
-        out(" ] [  0:W{}:B{} ]\n[ ".format(jailed, homed))
-        for i in range(13, 25):
+        out(" ] [  {}:W{}:B{} ]\n[ ".format(BLACK_HOME, jailed, homed))
+        for i in range(WHITE_HOME-12, WHITE_HOME):
             if i == 19:
                 out(' ] [ ')
             out(str(I.points[i]))
@@ -103,7 +105,7 @@ class Board(object):
                 out(' | ')
         homed = len(I.homed(WHITE))
         jailed = len(I.jailed(BLACK))
-        out(" ] [ 25:B{}:W{} ]".format(jailed, homed))
+        out(" ] [ {}:B{}:W{} ]".format(WHITE_HOME, jailed, homed))
         return ''.join(l)
 
     def copy(I):
@@ -123,11 +125,11 @@ class Board(object):
         new = I.copy()
         if not isinstance(dst, int):
             dst = dst.num
-        assert dst >= 0 and dst <= 25, 'valid points are [0..25]'
+        assert dst >= BLACK_HOME and dst <= WHITE_HOME, 'valid points are [{}..{}]'.format(BLACK_HOME, WHITE_HOME)
         dst = new.points[dst]
         if not isinstance(src, int):
             src = src.num
-        assert src >= 0 and src <= 25, 'valid points are [0..25]'
+        assert src >= BLACK_HOME and src <= WHITE_HOME, 'valid points are [{}..{}]'.format(BLACK_HOME, WHITE_HOME)
         src = new.points[src]
         sharing_allowed = dst in (new.home(WHITE), new.home(BLACK))
         if not sharing_allowed:
@@ -144,7 +146,7 @@ class Board(object):
         combinations of unused dies.
         """
         if isinstance(point, int):
-            assert point >= 0 and point <= 25, 'valid points are [0..25]'
+            assert point >= BLACK_HOME and point <= WHITE_HOME, 'valid points are [{}..{}]'.format(BLACK_HOME, WHITE_HOME)
             point = I.points[point]
         assert point.pieces, 'there are no pieces on this point'
         piece = point.pieces[0]
@@ -160,19 +162,32 @@ class Board(object):
             paths = [(dies[0], dies[1]), (dies[1], dies[0])]
         multiple_jailed = len(I.jailed(piece.color)) > 1
         moves = []
-        min_point = 1
-        max_point = 24
-        if I.can_go_home(piece.color):
+        this_homer = None # Position of given point relative to home: (1,2,3,4,5,6)
+        max_homer = None
+        min_point = BLACK_HOME + 1
+        max_point = WHITE_HOME - 1
+        can_go_home = I.can_go_home(piece.color)
+        if can_go_home:
             if piece.color == BLACK:
-                min_point -= 1
+                min_point = BLACK_HOME
+                max_homer = max(i for i in range(1, 7) if I.points[i].color == BLACK)
+                this_homer = point.num
             else:
-                max_point += 1
+                max_point = WHITE_HOME
+                max_homer = max(WHITE_HOME - i for i in range(WHITE_HOME-6, WHITE_HOME) if I.points[i].pieces == WHITE)
+                this_homer = WHITE_HOME - point.num
         for hops in paths:
             if multiple_jailed:
                 hops = hops[:1]
             num = point.num
             for hop in hops:
+                if can_go_home and hop > this_homer and max_homer > this_homer:
+                    # Must move pieces in higher ranks before moving this one home.
+                    break
                 num += direction * hop
+                if can_go_home and hop > this_homer and this_homer == max_homer:
+                    # Let this piece move home since there are no further pieces to move.
+                    num = BLACK_HOME if piece.color == BLACK else WHITE_HOME
                 if num < min_point or num > max_point or I.points[num].blocked(piece.color):
                     break
                 if num not in moves:
@@ -200,7 +215,7 @@ class Board(object):
         """
         Return Point that represents jail for given color.
         """
-        return I.points[0 if color == WHITE else 25]
+        return I.points[BLACK_HOME if color == WHITE else WHITE_HOME]
 
     def jailed(I, color):
         """
@@ -212,7 +227,7 @@ class Board(object):
         """
         Return Point that represents home for given color.
         """
-        return I.points[0 if color == BLACK else 25]
+        return I.points[BLACK_HOME if color == BLACK else WHITE_HOME]
 
     def homed(I, color):
         """
@@ -233,11 +248,11 @@ class Board(object):
         if color == WHITE:
             enemy = BLACK
             behind = operator.gt
-            enemy_line = I.points[max(i for i in range(25, 1, -1) if I.points[i].color == enemy)]
+            enemy_line = I.points[max(i for i in range(WHITE_HOME, BLACK_HOME, -1) if I.points[i].color == enemy)]
         else:
             enemy = WHITE
             behind = operator.lt
-            enemy_line = I.points[min(i for i in range(0, 24, 1) if I.points[i].color == enemy)]
+            enemy_line = I.points[min(i for i in range(BLACK_HOME, WHITE_HOME, 1) if I.points[i].color == enemy)]
         return [pt for pt in I.points if behind(pt, enemy_line) and pt.pieces]
 
     def exposed(I, color):
@@ -298,7 +313,7 @@ class Point(KeyedMixin, object):
         """
         if piece not in I.pieces:
             I._pieces += (piece,)
-            if I.num not in (0,25): # Making exception for jail/home.
+            if I.num not in (BLACK_HOME, WHITE_HOME):
                 assert set(i.color for i in I.pieces) == set([piece.color]), \
                     'only pieces of same color allowed in a point'
 
@@ -316,7 +331,7 @@ class Point(KeyedMixin, object):
         True if this Point contains more than one opposing Piece,
         excluding home/jail since they should never be blocked.
         """
-        return I.num not in (0,25) and color != I.color and len(I.pieces) > 1
+        return I.num not in (BLACK_HOME, WHITE_HOME) and color != I.color and len(I.pieces) > 1
 
     @property
     def color(I):
@@ -328,10 +343,10 @@ class Point(KeyedMixin, object):
         val = None
         if I.pieces:
             colors = set(i.color for i in I.pieces)
-            if I.num == 0:
+            if I.num == BLACK_HOME:
                 if WHITE in colors:
                     val = WHITE
-            elif I.num == 25:
+            elif I.num == WHITE_HOME:
                 if BLACK in colors:
                     val = BLACK
             elif len(colors) == 1:
@@ -357,8 +372,8 @@ class Piece(object):
         return I._num
 
     def __init__(I, color, num):
-        assert num >= 0 and num <= 15, \
-            "number out of range [0,15]: {}".format(num)
+        assert num >= 0 and num <= 14, \
+            "number out of range [0,14]: {}".format(num)
         assert color in (WHITE, BLACK), \
             "color must be '{}' or '{}': {}".format(WHITE, BLACK, color)
         I._color = color
